@@ -108,7 +108,6 @@ def create_user_table():
         f = csv.reader(open("csv_data/users.csv", "r"))
 
         for line in list(f)[1:]:
-            print line[6]
             if str(line[6]).find("More than 16") != -1:
                 line[6] = 17
             if str(line[6]).lower() == "less than an hour":
@@ -119,7 +118,6 @@ def create_user_table():
             if str(line[6]).lower().find("hour") != -1:
                 line[6] = int(line[6].lower().replace(" hour","").replace("s",""))
 
-            print line[7]
             if str(line[7]).find("More than 16") != -1:
                 line[7] = 17
             if str(line[7]).lower() == "less than an hour":
