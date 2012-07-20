@@ -48,6 +48,12 @@ def tenFolds():
     return folds
 
 if __name__ == "__main__":
+    if libmc:
+        mc = pylibmc.Client(["127.0.0.1"], binary=True,
+                         behaviors={"tcp_nodelay": True,
+                                    "ketama": True})
+
+        mc.delete("mdsh_rows")
     start = time.time()
     x = tenFolds()
     end = time.time()
