@@ -14,6 +14,13 @@ def dict_factory(cursor, row):
         d[col[0]] = row[idx]
     return d
 
+
+def fold(r, i, k):
+    return r[i * k : (i + 1) * k]
+
+def rest(r, i, k):
+    return r[0 : i * k] + r[(i + 1) * k:-1] 
+
 def tenFolds():
     if libmc:
         mc = pylibmc.Client(["127.0.0.1"], binary=True,
@@ -35,11 +42,8 @@ def tenFolds():
     print "end sql"
     folds = []
     r = rows
-    for i in range(0,10):
-        folda = r[i * len(r)/10 : (i + 1) * len(r) / 10]
-        foldb = r[0 : i * len(r)/10] + r[(i + 1) * len(r)/10:-1]
-
-        folds.append((folda,foldb))
+    k = len(r)/10
+    folds = [(fold(r, i, k),rest(r, i, k)) for i in range(0,10)]
     
     return folds
 
