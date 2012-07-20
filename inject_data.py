@@ -114,7 +114,6 @@ def create_user_table():
                 line[6] = 0
             if str(line[6]).find("16+") != -1:
                 line[6] = 17
-
             if str(line[6]).lower().find("hour") != -1:
                 line[6] = int(line[6].lower().replace(" hour","").replace("s",""))
 
@@ -124,7 +123,6 @@ def create_user_table():
                 line[7] = 0
             if str(line[7]).find("16+") != -1:
                 line[7] = 17
-
             if str(line[7]).lower().find("hour") != -1:
                 line[7] = int(line[7].lower().replace(" hour","").replace("s",""))
             cur.execute("INSERT INTO users VALUES(" + ",".join(["?"] * len(line)) + ")",tuple(line)) 
