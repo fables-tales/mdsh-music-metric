@@ -2,7 +2,11 @@ import sqlite3
 import time
 from sklearn.cross_validation import ShuffleSplit
 from random import shuffle
-import pylibmc
+libmc = True
+try:
+    import pylibmc
+except:
+    libmc = False
 
 def dict_factory(cursor, row):
     d = {}
@@ -11,11 +15,12 @@ def dict_factory(cursor, row):
     return d
 
 def tenFolds():
-    mc = pylibmc.Client(["127.0.0.1"], binary=True,
-                     behaviors={"tcp_nodelay": True,
-                                "ketama": True})
+    if libmc:
+        mc = pylibmc.Client(["127.0.0.1"], binary=True,
+                         behaviors={"tcp_nodelay": True,
+                                    "ketama": True})
     rows = None
-    if mc.get("mdsh_rows") is None:
+    if libmc and mc.get("mdsh_rows") is None:
         print "sql"
         conn = sqlite3.connect("db.sqlite")
         conn.row_factory = dict_factory
