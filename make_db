@@ -1,0 +1,7 @@
+#!/bin/bash
+./sqlshell < sqlscripts/create_processed_words_table.sql 
+./sqlshell < sqlscripts/create_raw_words_table.sql       
+./sqlshell < sqlscripts/create_table_test.sql           
+./sqlshell < sqlscripts/create_train_table.sql         
+./sqlshell < sqlscripts/create_user_table.sql
+
