@@ -6,7 +6,6 @@ import cPickle as pickle
 
 import recsys.algorithm
 
-recsys.algorithm.VERBOSE = True
 from recsys.algorithm.factorize import SVD, SVDNeighbourhood
 from recsys.evaluation.prediction import RMSE, MAE
 
@@ -26,45 +25,11 @@ def dict_factory(cursor, row):
         d[col[0]] = row[idx]
     return d
 
-
-def fold(r, i, k):
-    return r[i * k : (i + 1) * k]
-
-def rest(r, i, k):
-    return r[0 : i * k] + r[(i + 1) * k:-1] 
-
-def tenFolds():
-    if libmc:
-        mc = pylibmc.Client(["127.0.0.1"], binary=True,
-                         behaviors={"tcp_nodelay": True,
-                                    "ketama": True})
-    rows = None
-    if libmc and mc.get("mdsh_rows") is None:
-        print "sql"
-        conn = sqlite3.connect("db.sqlite")
-        conn.row_factory = dict_factory
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM train")
-
-        rows = list(cur)
-        mc.set("mdsh_rows", rows)
-    else:
-        rows = mc["mdsh_rows"]
-        
-    print "end sql"
-    folds = []
-    r = rows
-    k = len(r)/10
-    folds = [(fold(r, i, k),rest(r, i, k)) for i in range(0,10)]
-    
-    return folds
-
-
-
-def collab_filter(model, filename):
+def collab_filter(model, filename, selector="SELECT rating,track,user FROM train"):
     conn = sqlite3.connect("db.sqlite")
     cur = conn.cursor()
-    l = list(cur.execute("SELECT rating,track,user FROM train"))
+    l = list(cur.execute(selector))
+    print "results",len(l)
     K = 100
     svd = model
     svd.set_data(l)
@@ -81,11 +46,14 @@ def everything_average():
 user_fallbacks = 0
 track_fallbacks = 0
 everything_fallbacks = 0
+artist_fallbacks = 0
+everything_average = everything_average()
 
 def predict_item(svd, track, user):
     global everything_fallbacks
     global track_fallbacks
     global user_fallbacks
+    
     try:
         r = svd.predict(track,user) 
     except (KeyError), err:
@@ -96,9 +64,9 @@ def predict_item(svd, track, user):
             r = user_means[user]
             track_fallbacks += 1
         else:
-            r = everything_average()
+            r = everything_average 
             everything_fallbacks += 1
-        
+    
     if r > 100:
         r = 100
     if r < 0:
@@ -106,27 +74,40 @@ def predict_item(svd, track, user):
 
     return r
 
+def load_svd(filename):
+    svd = SVD() 
+    svd.load_model(filename)
+    return svd
 
 
-def test_classifier(model, filename):
+def test_classifier(model, filename=None, itemkey="track", selector="SELECT * FROM train"):
     conn = sqlite3.connect("db.sqlite")
     conn.row_factory = dict_factory
     cur = conn.cursor()
-    cur.execute("SELECT count(*) fROM train")
-    c = cur.fetchone()
-    print c
-    svd = model
-    svd.load_model(filename)
-    l = cur.execute("SELECT * FROM train")
-    pairs = []
-    for idx,item in enumerate(l): 
-        user = item["user"]
-        track = item["track"]
-        if idx % 1024 == 0:
-            print idx, c
-        pairs.append((predict_item(svd, track,user), item["rating"]))
+    s = 0
+    c = 0
+    t_p = 0
+    for i in range(0,10):
+        svd = SVD()
+        if filename is not None:
+            svd.load_model(filename)
+        l = list(cur.execute(selector))
+        random.shuffle(l)
+        count = len(l)
+        svd.set_data([(x["rating"],x["track"],x["user"]) for x in l[0:int(count*0.7)]])
+        K = 100
+        svd.compute(k=K, min_values=0.0, pre_normalize=None, mean_center=True, post_normalize=True)
 
-    print RMSE(pairs).compute()
+        pairs = []
+        for idx,item in enumerate(l[int(count*0.7):]): 
+            user = item["user"]
+            track = item[itemkey]
+            pairs.append((predict_item(svd, track,user), item["rating"]))
+        t_p += len(pairs)
+        s += RMSE(pairs).compute()
+        c += 1.0
+        print "iteration"
+    print s/c, t_p
 
 
 def track_averages():
@@ -149,18 +130,11 @@ def user_averages():
         scores[row["user"]] = row["avg(rating)"]
     return scores
 
-
-
-def classify_test_set(model,filename):
+def classify_test_set(svd, selector):
     conn = sqlite3.connect("db.sqlite")
     conn.row_factory = dict_factory
     cur = conn.cursor()
-    cur.execute("SELECT count(*) fROM test")
-    c = cur.fetchone()
-    print c
-    svd = model
-    svd.load_model(filename)
-    l = cur.execute("SELECT * FROM test")
+    l = cur.execute(selector)
     pairs = []
     track_means = track_averages()
     user_means  = user_averages()
@@ -169,25 +143,44 @@ def classify_test_set(model,filename):
         user = item["user"]
         track = item["track"]
         if idx % 1024 == 0:
-            print idx, c
+            print idx
         
         r = predict_item(svd, track, user)
         build += str(item["artist"]) + "," + str(item["track"]) + "," + str(item["user"]) +  "," + str(r) + "\n"
 
-
-    f = open("answer.csv", "w")
-    f.write(build)
-    f.flush()
-    f.close()
-
+    return build
 
 if __name__ == "__main__":
-    test_classifier(SVD(), "svd.model")
+    #track_model = load_svd("svd.model")
+    #artist_model = load_svd("svd-artists.model")
+    #test_classifier(SVD(), "svd.model")
+    #test_classifier(SVD(), "svd-artists.model", "artist")
     #x = SVDNeighbourhood()
     #collab_filter(x, "svd-n.model")
     #print "bees"
     #test_classifier(x, "svd-n.model")
-    classify_test_set(SVD(), "svd.model")
-    print "missing users", user_fallbacks
-    print "missing track", track_fallbacks
-    print "all missing"  , everything_fallbacks
+    
+    x = SVD()
+    y = SVD()
+    z = SVD()
+
+    collab_filter(x, "tracks-male.model", "SELECT t.rating,t.track,t.user FROM train t")
+    #collab_filter(y, "tracks-female.model", "SELECT t.rating,t.track,t.user FROM train t,users u where u.user=t.user AND u.gender='Female'")
+    #collab_filter(z, "tracks-noresp.model", "select t.rating,t.track,t.user from train t where t.user not in (select user from users);")
+    test_classifier(x,selector="SELECT t.rating,t.track,t.user FROM train t")
+    #test_classifier(y,selector="SELECT t.rating,t.track,t.user FROM train t,users u where u.user=t.user AND u.gender='Female'")
+    #test_classifier(z,selector="select t.rating,t.track,t.user from train t where t.user not in (select user from users);")
+
+
+    #build = classify_test_set(x, selector="SELECT t.* FROM test t,users u where u.user=t.user AND u.gender='Male'")
+    #build += classify_test_set(y, selector="SELECT t.* FROM test t,users u where u.user=t.user AND u.gender='Female'")
+    #build += classify_test_set(z, selector="select t.* from test t where t.user not in (select user from users);")
+
+    f = open("answer.csv","w")
+    f.write(build)
+    f.close()
+
+    print "missing users" , user_fallbacks
+    print "missing track" , track_fallbacks
+    print "all missing"   , everything_fallbacks
+    print "artist fb"     , artist_fallbacks
