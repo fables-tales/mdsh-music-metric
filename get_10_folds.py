@@ -11,6 +11,12 @@ from recsys.evaluation.prediction import RMSE, MAE
 
 import random
 
+def dict_factory():
+    d = {}
+    for idx,col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
+
 
 libmc = True
 
@@ -30,7 +36,7 @@ def collab_filter(model, filename, selector="SELECT rating,track,user FROM train
     cur = conn.cursor()
     l = list(cur.execute(selector))
     print "results",len(l)
-    K = 100
+    K = 1000
     svd = model
     svd.set_data(l)
     svd.compute(k=K, min_values=0.0, pre_normalize=None, mean_center=True, post_normalize=True)
@@ -95,7 +101,7 @@ def test_classifier(model, filename=None, itemkey="track", selector="SELECT * FR
         random.shuffle(l)
         count = len(l)
         svd.set_data([(x["rating"],x["track"],x["user"]) for x in l[0:int(count*0.7)]])
-        K = 100
+        K = 1000
         svd.compute(k=K, min_values=0.0, pre_normalize=None, mean_center=True, post_normalize=True)
 
         pairs = []
@@ -166,18 +172,25 @@ if __name__ == "__main__":
     conn = sqlite3.connect("db.sqlite")
     cur = conn.cursor()
     cur.execute("SELECT distinct time from train")
+    times = list(cur)
     build = []
-    for row in cur:
-        x = SVD()
-        selector = "SELECT t.rating,t.track,t.user FROM train t where t.time=" + str(row[0]) 
 
+    cur2 = conn.cursor()
+    no_demographics = cur2.execute("select t.user from train t where t.user not in (select user from users);")
+    
+
+    train_query = "SELECT t.rating,t.track,t.user FROM train t"  
+    test_query  = "SELECT t.* from test t"
+
+    for row in times:
+        x = SVD()
+        selector = train_query + " WHERE t.time=" +  str(row[0]) 
         collab_filter(x, "tracks-male.model", selector)
-        build += classify_test_set(x, selector="SELECT t.* FROM test t where t.time=" + str(row[0])) 
-        print len(build)
+        test_classifier(x, selector=selector)
+        build += classify_test_set(x, selector=test_query +  " WHERE t.time=" +  str(row[0]))
 
     build = sorted(build, key=lambda x: x["order"])
     build = "\n".join([str(x["score"]) for x in build])
-    build += "\n"
 
     f = open("answer.csv","w")
     f.write(build)
