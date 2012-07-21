@@ -2,7 +2,17 @@ import sqlite3
 import time
 from sklearn.cross_validation import ShuffleSplit
 from random import shuffle
+import cPickle as pickle
+
+import recsys.algorithm
+
+recsys.algorithm.VERBOSE = True
+from recsys.algorithm.factorize import SVD
+from recsys.evaluation.prediction import RMSE, MAE
+
+
 libmc = True
+
 try:
     import pylibmc
 except:
@@ -47,22 +57,18 @@ def tenFolds():
     
     return folds
 
-if __name__ == "__main__":
-    if libmc:
-        mc = pylibmc.Client(["127.0.0.1"], binary=True,
-                         behaviors={"tcp_nodelay": True,
-                                    "ketama": True})
 
-        mc.delete("mdsh_rows")
-    start = time.time()
-    x = tenFolds()
-    end = time.time()
-    print end-start
+
+def collab_filter():
+    conn = sqlite3.connect("db.sqlite")
+    cur = conn.cursor()
+    l = list(cur.execute("SELECT user,track,rating FROM train"))
+    K = 100
+    svd = SVD()
+    svd.set_data(l)
+    svd.compute(k=K, min_values=0.1, pre_normalize=None, mean_center=True, post_normalize=True)
+    svd.save_model("svd.model")
     
-    start = time.time()
-    y = tenFolds()
-    end = time.time()
-    print end-start
-    assert x == y
-    print x[0][0][0]
-    print y[0][0][0]
+
+if __name__ == "__main__":
+    collab_filter()
