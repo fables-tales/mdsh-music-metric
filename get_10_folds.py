@@ -33,7 +33,7 @@ def collab_filter(model, filename, selector="SELECT rating,track,user FROM train
     K = 100
     svd = model
     svd.set_data(l)
-    svd.compute(k=K, min_values=0.0, pre_normalize=None, mean_center=False, post_normalize=True)
+    svd.compute(k=K, min_values=0.0, pre_normalize=None, mean_center=True, post_normalize=True)
     svd.save_model(filename)
 
 
@@ -138,7 +138,7 @@ def classify_test_set(svd, selector):
     pairs = []
     track_means = track_averages()
     user_means  = user_averages()
-    build = ""
+    build = []
     for idx,item in enumerate(l): 
         user = item["user"]
         track = item["track"]
@@ -146,7 +146,7 @@ def classify_test_set(svd, selector):
             print idx
         
         r = predict_item(svd, track, user)
-        build += str(item["artist"]) + "," + str(item["track"]) + "," + str(item["user"]) +  "," + str(r) + "\n"
+        build.append({"score":r,"order":item["oc"]}) 
 
     return build
 
@@ -161,20 +161,23 @@ if __name__ == "__main__":
     #test_classifier(x, "svd-n.model")
     
     x = SVD()
-    y = SVD()
-    z = SVD()
-
-    collab_filter(x, "tracks-male.model", "SELECT t.rating,t.track,t.user FROM train t")
-    #collab_filter(y, "tracks-female.model", "SELECT t.rating,t.track,t.user FROM train t,users u where u.user=t.user AND u.gender='Female'")
-    #collab_filter(z, "tracks-noresp.model", "select t.rating,t.track,t.user from train t where t.user not in (select user from users);")
-    test_classifier(x,selector="SELECT t.rating,t.track,t.user FROM train t")
-    #test_classifier(y,selector="SELECT t.rating,t.track,t.user FROM train t,users u where u.user=t.user AND u.gender='Female'")
-    #test_classifier(z,selector="select t.rating,t.track,t.user from train t where t.user not in (select user from users);")
 
 
-    #build = classify_test_set(x, selector="SELECT t.* FROM test t,users u where u.user=t.user AND u.gender='Male'")
-    #build += classify_test_set(y, selector="SELECT t.* FROM test t,users u where u.user=t.user AND u.gender='Female'")
-    #build += classify_test_set(z, selector="select t.* from test t where t.user not in (select user from users);")
+    conn = sqlite3.connect("db.sqlite")
+    cur = conn.cursor()
+    cur.execute("SELECT distinct time from train")
+    build = []
+    for row in cur:
+        x = SVD()
+        selector = "SELECT t.rating,t.track,t.user FROM train t where t.time=" + str(row[0]) 
+
+        collab_filter(x, "tracks-male.model", selector)
+        build += classify_test_set(x, selector="SELECT t.* FROM test t where t.time=" + str(row[0])) 
+        print len(build)
+
+    build = sorted(build, key=lambda x: x["order"])
+    build = "\n".join([str(x["score"]) for x in build])
+    build += "\n"
 
     f = open("answer.csv","w")
     f.write(build)

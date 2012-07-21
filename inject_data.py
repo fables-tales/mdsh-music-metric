@@ -40,9 +40,11 @@ def create_test_table():
     print "testing rows",rows[0]
     if rows[0] == 0:
         f = open("csv_data/test.csv").read().strip().replace("\r","").split("\n")
+        i = 0
         for line in f[1:]:
             split = line.split(",")
-            cur.execute("INSERT INTO test (artist,track,user,time) VALUES (?,?,?,?);", (split[0],split[1],split[2],split[3]))
+            cur.execute("INSERT INTO test (artist,track,user,time,oc) VALUES (?,?,?,?,?);", (split[0],split[1],split[2],split[3],i))
+            i += 1
         conn.commit() 
         print "injected",len(f[1:]),"rows into test"
 
