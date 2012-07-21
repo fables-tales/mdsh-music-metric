@@ -44,6 +44,8 @@ def main(argv=None):
     print 'max', max(drift)
     print 'min', min(drift)
     print 'mean', sum(drift)/float(len(drift))
+    print 'changed', drift.count(0.0)
+    
     
     
 
