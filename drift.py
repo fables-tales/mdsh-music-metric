@@ -27,24 +27,24 @@ class Usage(Exception):
 def main(argv=None):
     file1 = sys.argv[1]
     file2 = sys.argv[2]
-    file1predicts = {}
+    file1predicts = []
     drift = []
     with open(file1) as fh:
         filecsv = csv.reader(fh)
-        for artist, track, user, rating in filecsv:
-            file1predicts[track+":"+user] = rating
+        for (rating,) in filecsv:
+            file1predicts.append(rating)
     with open(file2) as fh:
         filecsv = csv.reader(fh)
-        for artist, track, user, rating in filecsv:
+        for idx, (rating,) in enumerate(filecsv):
             try:
-                drift.append(((float(file1predicts[track+":"+user])-float(rating))**2)**0.5)
+                drift.append(((float(file1predicts[idx])-float(rating))**2)**0.5)
             except KeyError:
                 print 'file one lacks the rating of ', track, 'by', user
     
     print 'max', max(drift)
     print 'min', min(drift)
     print 'mean', sum(drift)/float(len(drift))
-    print 'changed', drift.count(0.0)
+    print 'changed', len(drift) - drift.count(0.0)
     
     
     
