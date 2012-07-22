@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
 
     # clf = RandomForestRegressor() 
-    clf = RandomForestRegressor(n_jobs=1,n_estimators=80, max_depth=10, min_samples_split=20, random_state=0,min_density=0.8, compute_importances=True)
+    clf = RandomForestRegressor(n_jobs=1,n_estimators=100, max_depth=10, min_samples_split=20, random_state=0,min_density=0.8, compute_importances=True)
     
 
     
@@ -71,8 +71,9 @@ if __name__ == "__main__":
              pred = 0.0
         else:
              pred = cls
-         
-    results.append({"score":pred,"order":x['oc']})
-    if idx % 1024 == 0:
-         print idx
+        # print x
+        results.append({"score":pred,"order":x['oc']})
+        if idx % 1024 == 0:
+            print idx
+    
     simplejson.dump(wh, results)
